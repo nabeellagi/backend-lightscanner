@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Image to PDF - Test Upload</title>
+  <style>
+    body { font-family: sans-serif; max-width: 500px; margin: 40px auto; }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    select, input[type="file"] { display: block; margin-top: 4px; width: 100%; }
+    button { margin-top: 16px; padding: 10px 20px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Image to PDF - Test Upload</h2>
+
+  <form id="uploadForm">
+    <label for="mode">Mode</label>
+    <select id="mode" name="mode">
+      <option value="normal">normal</option>
+      <option value="black-and-white">black-and-white</option>
+      <option value="grayscale">grayscale</option>
+      <option value="enhance">enhance</option>
+      <option value="vivid">vivid</option>
+
+    </select>
+
+    <label for="files">Images (select multiple: ctrl/cmd + click)</label>
+    <input type="file" id="files" name="files" accept=".jpg,.jpeg,.png" multiple />
+
+    <button type="submit">Convert to PDF</button>
+  </form>
+
+  <p id="status"></p>
+
+  <script>
+    const form = document.getElementById("uploadForm");
+    const status = document.getElementById("status");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const mode = document.getElementById("mode").value;
+      const files = document.getElementById("files").files;
+
+      if (files.length === 0) {
+        status.textContent = "Pick at least one image first.";
+        return;
+      }
+
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append("files", file);
+      }
+
+      status.textContent = "Uploading...";
+
+      try {
+        const res = await fetch(`/mode/${mode}`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          status.textContent = "Error: " + JSON.stringify(err.detail);
+          return;
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${mode}.pdf`;
+        a.click();
+        status.textContent = "Done — PDF downloaded.";
+      } catch (err) {
+        status.textContent = "Request failed: " + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
