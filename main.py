@@ -1,8 +1,9 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from core.security import verify_api_key
 
 from core.config import (
     MAX_FILE_SIZE_BYTES,
@@ -23,12 +24,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+
+if ENVIRONMENT == "production":
+    default_origins = "https://lightscanner.vercel.app"
+else:
+    default_origins = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173"
+    
 allowed_origins = [
     origin.strip()
-    for origin in os.getenv(
-        "CLIENT_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000",
-    ).split(",")
+    for origin in os.getenv("CLIENT_ORIGINS", default_origins).split(",")
     if origin.strip()
 ]
 
@@ -40,8 +45,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(modes.router)
-app.include_router(convert.router)
+app.include_router(modes.router, dependencies=[Depends(verify_api_key)])
+app.include_router(convert.router, dependencies=[Depends(verify_api_key)])
 
 app.mount(
     "/test",
