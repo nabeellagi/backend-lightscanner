@@ -45,7 +45,13 @@ MAX_FILE_SIZE_BYTES: int = 10 * 1024 * 1024 # 10MB
 ALLOWED_CONTENT_TYPES: set[str] = {
     "image/jpeg",
     "image/jpg",
-    "image/png"
+    "image/png",
+    "image/webp",
 }
 
-ALLOWED_EXTENSIONS: set[str] = {".jpg", ".jpeg", ".png"}
+ALLOWED_EXTENSIONS: set[str] = {
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+}
