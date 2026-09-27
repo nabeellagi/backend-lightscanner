@@ -62,6 +62,7 @@ app.mount(
     "/health",
     tags=["Health"],
     summary="Health check",
+    dependencies=[Depends(verify_api_key)],
 )
 def health() -> dict[str, str]:
     return {"status": "ok"}
