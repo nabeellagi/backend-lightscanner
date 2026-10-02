@@ -19,7 +19,16 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
 from PIL import Image, UnidentifiedImageError
 from starlette import status
-from core.config import ConversionMode
+from core.config import (
+    CM_PER_INCH,
+    CUSTOM_PAGE_MAX_CM,
+    CUSTOM_PAGE_MIN_CM,
+    FIT_PAGE_MAX_LONG_SIDE_IN,
+    PAGE_SIZE_CUSTOM,
+    PAGE_SIZE_FIT,
+    PAGE_SIZE_TOLERANCE_IN,
+    ConversionMode,
+)
 from core.validation import (
     validate_batch_size,
     validate_file_size,
@@ -50,6 +59,9 @@ class ImageLayout(BaseModel):
     marginXIn: float = Field(ge=0)
     marginYIn: float = Field(ge=0)
 
+    pageWidthIn: float | None = Field(default=None, gt=0, le=100)
+    pageHeightIn: float | None = Field(default=None, gt=0, le=100)
+
 
 class ConversionSettings(BaseModel):
     """Page and per-image layout settings."""
@@ -68,6 +80,53 @@ class ConversionSettings(BaseModel):
     )
 
     images: list[ImageLayout]
+
+
+def _validate_custom_page(settings: "ConversionSettings") -> None:
+    """Custom page sizes must stay between 10 cm and 60 cm per side."""
+    min_in = CUSTOM_PAGE_MIN_CM / CM_PER_INCH
+    max_in = CUSTOM_PAGE_MAX_CM / CM_PER_INCH
+
+    for label, value in (
+        ("width", settings.pageWidthIn),
+        ("height", settings.pageHeightIn),
+    ):
+        if (
+            value < min_in - PAGE_SIZE_TOLERANCE_IN
+            or value > max_in + PAGE_SIZE_TOLERANCE_IN
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Custom page {label} must be between "
+                    f"{CUSTOM_PAGE_MIN_CM:g} and "
+                    f"{CUSTOM_PAGE_MAX_CM:g} cm."
+                ),
+            )
+
+
+def _validate_fit_page(settings: "ConversionSettings") -> None:
+    """Fit-to-page"""
+    for item in settings.images:
+        if item.pageWidthIn is None or item.pageHeightIn is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Image {item.index + 1} is missing its "
+                    "fit-to-page size."
+                ),
+            )
+
+        longest = max(item.pageWidthIn, item.pageHeightIn)
+
+        if longest > FIT_PAGE_MAX_LONG_SIDE_IN + PAGE_SIZE_TOLERANCE_IN:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Fit-to-page size for image {item.index + 1} "
+                    "is too large."
+                ),
+            )
 
 
 def parse_settings(
@@ -141,14 +200,46 @@ def parse_settings(
             ),
         )
 
+    if settings.pageSizeId == PAGE_SIZE_CUSTOM:
+        _validate_custom_page(settings)
+
+    if settings.pageSizeId == PAGE_SIZE_FIT:
+        _validate_fit_page(settings)
+
+    elif any(
+        item.pageWidthIn is not None
+        or item.pageHeightIn is not None
+        for item in settings.images
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Per-image page sizes are only allowed "
+                "with the 'fit' page size."
+            ),
+        )
+
     for item in settings.images:
+        # Fit-to-page images carry their own page size.
+        page_width_in = (
+            item.pageWidthIn
+            if item.pageWidthIn is not None
+            else settings.pageWidthIn
+        )
+
+        page_height_in = (
+            item.pageHeightIn
+            if item.pageHeightIn is not None
+            else settings.pageHeightIn
+        )
+
         expected_margin_x = (
-            settings.pageWidthIn
+            page_width_in
             - item.renderedWidthIn
         ) / 2
 
         expected_margin_y = (
-            settings.pageHeightIn
+            page_height_in
             - item.renderedHeightIn
         ) / 2
 

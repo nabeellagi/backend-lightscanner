@@ -55,3 +55,16 @@ ALLOWED_EXTENSIONS: set[str] = {
     ".png",
     ".webp",
 }
+
+PAGE_SIZE_FIT = "fit"
+PAGE_SIZE_CUSTOM = "custom"
+
+CUSTOM_PAGE_MIN_CM: float = 10  #cm
+CUSTOM_PAGE_MAX_CM: float = 65 #cm
+
+
+FIT_PAGE_MAX_LONG_SIDE_IN: float = 16.54
+
+CM_PER_INCH: float = 2.54
+
+PAGE_SIZE_TOLERANCE_IN: float = 0.01

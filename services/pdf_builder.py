@@ -43,9 +43,25 @@ def _make_layout_fun(settings: dict) -> Callable:
             item["renderedHeightIn"]
         )
 
+        # "Fit to page"
+        item_page_width_in = item.get("pageWidthIn")
+        item_page_height_in = item.get("pageHeightIn")
+
+        item_page_width_pt = (
+            img2pdf.in_to_pt(item_page_width_in)
+            if item_page_width_in
+            else page_width_pt
+        )
+
+        item_page_height_pt = (
+            img2pdf.in_to_pt(item_page_height_in)
+            if item_page_height_in
+            else page_height_pt
+        )
+
         return (
-            page_width_pt,
-            page_height_pt,
+            item_page_width_pt,
+            item_page_height_pt,
             rendered_width_pt,
             rendered_height_pt,
         )
@@ -79,7 +95,6 @@ def build_pdf_from_images(
             buffer.getvalue()
         )
 
-    # Old behavior remains intact.
     if settings is None:
         return img2pdf.convert(
             encoded_pages
